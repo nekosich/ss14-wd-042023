@@ -14,7 +14,11 @@ Space Station 14 это ремейк SS13, который работает на 
 ## Сборка
 
 1. Склонируйте этот репозиторий локально
-2. Включить [Duran Duran - Invisible](https://www.youtube.com/watch?v=SMCd5zrsFpE), так как скорее всего это больше не запустить.
+2. Включить [Duran Duran - Invisible](https://www.youtube.com/watch?v=SMCd5zrsFpE).
+3. dotnet build --configuration Release
+4. git submodule update --init --recursive
+5. fix-local-db.bat
+6. Запускать Content.Server.exe
 
 [Более подробная инструкция по запуску проекта.](https://docs.spacestation14.io/getting-started/dev-setup)
 
