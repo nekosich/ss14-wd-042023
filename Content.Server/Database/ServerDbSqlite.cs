@@ -62,11 +62,39 @@ namespace Content.Server.Database
 
         private static void EnsureLegacyUserIdColumn(SqliteServerDbContext db, string tableName, string indexName)
         {
+            if (!SqliteTableExists(db, tableName))
+                return;
+
             if (SqliteColumnExists(db, tableName, "user_id"))
                 return;
 
             db.Database.ExecuteSqlRaw($"ALTER TABLE {tableName} ADD COLUMN user_id TEXT NULL;");
             db.Database.ExecuteSqlRaw($"CREATE INDEX IF NOT EXISTS {indexName} ON {tableName} (user_id);");
+        }
+
+        private static bool SqliteTableExists(SqliteServerDbContext db, string table)
+        {
+            var connection = db.Database.GetDbConnection();
+            var wasOpen = connection.State == ConnectionState.Open;
+
+            if (!wasOpen)
+                connection.Open();
+
+            try
+            {
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = $name LIMIT 1;";
+                var nameParam = cmd.CreateParameter();
+                nameParam.ParameterName = "$name";
+                nameParam.Value = table;
+                cmd.Parameters.Add(nameParam);
+                return cmd.ExecuteScalar() != null;
+            }
+            finally
+            {
+                if (!wasOpen)
+                    connection.Close();
+            }
         }
 
         private static bool SqliteColumnExists(SqliteServerDbContext db, string table, string column)
