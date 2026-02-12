@@ -131,8 +131,9 @@ public abstract class SharedChatSystem : EntitySystem
     {
         if (string.IsNullOrEmpty(message))
             return message;
-        // Capitalize first letter
-        message = char.ToUpper(message[0]) + message.Remove(0, 1);
-        return message;
+        if (message.Length == 1)
+            return char.ToUpper(message[0]).ToString();
+
+        return string.Concat(char.ToUpper(message[0]).ToString(), message.Substring(1));
     }
 }
