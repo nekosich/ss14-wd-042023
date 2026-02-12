@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Data;
 using System.Linq;
 using System.Net;
 using System.Threading;
@@ -38,14 +39,63 @@ namespace Content.Server.Database
             if (cfg.GetCVar(CCVars.DatabaseSynchronous))
             {
                 _prefsCtx.Database.Migrate();
+                EnsureLegacySchemaCompatibility(_prefsCtx);
                 _dbReadyTask = Task.CompletedTask;
             }
             else
             {
-                _dbReadyTask = Task.Run(() => _prefsCtx.Database.Migrate());
+                _dbReadyTask = Task.Run(() =>
+                {
+                    _prefsCtx.Database.Migrate();
+                    EnsureLegacySchemaCompatibility(_prefsCtx);
+                });
             }
 
             cfg.OnValueChanged(CCVars.DatabaseSqliteDelay, v => _msDelay = v, true);
+        }
+
+        private static void EnsureLegacySchemaCompatibility(SqliteServerDbContext db)
+        {
+            EnsureLegacyUserIdColumn(db, "server_ban", "IX_server_ban_user_id");
+            EnsureLegacyUserIdColumn(db, "server_role_ban", "IX_server_role_ban_user_id");
+        }
+
+        private static void EnsureLegacyUserIdColumn(SqliteServerDbContext db, string tableName, string indexName)
+        {
+            if (SqliteColumnExists(db, tableName, "user_id"))
+                return;
+
+            db.Database.ExecuteSqlRaw($"ALTER TABLE {tableName} ADD COLUMN user_id TEXT NULL;");
+            db.Database.ExecuteSqlRaw($"CREATE INDEX IF NOT EXISTS {indexName} ON {tableName} (user_id);");
+        }
+
+        private static bool SqliteColumnExists(SqliteServerDbContext db, string table, string column)
+        {
+            var connection = db.Database.GetDbConnection();
+            var wasOpen = connection.State == ConnectionState.Open;
+
+            if (!wasOpen)
+                connection.Open();
+
+            try
+            {
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = $"PRAGMA table_info('{table}')";
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    var name = reader["name"] as string;
+                    if (string.Equals(name, column, StringComparison.OrdinalIgnoreCase))
+                        return true;
+                }
+
+                return false;
+            }
+            finally
+            {
+                if (!wasOpen)
+                    connection.Close();
+            }
         }
 
         #region Ban
